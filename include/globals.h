@@ -1,0 +1,4 @@
+#ifndef _DOORBELLE_GLOBALS_H_
+#define _DOORBELLE_GLOBALS_H_
+
+#endif
