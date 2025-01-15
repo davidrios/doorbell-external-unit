@@ -16,9 +16,6 @@
 #define BTN2_PIN D5
 #define BUZZER_PIN D2
 
-int btn1State = 0;
-int btn2State = 0;
-
 const int nokiaMelody[] = {
 	// Nokia Ringtone
 	// Score available at https://musescore.com/user/29944637/scores/5266155
