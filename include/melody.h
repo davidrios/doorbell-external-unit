@@ -1,9 +1,6 @@
 #ifndef _DOORBELLE_MELODY_H_
 #define _DOORBELLE_MELODY_H_
 
-#define DOORBELLE_SET_MELODY(instance, melody) \
-	instance.setMelody(melody, sizeof(melody) / sizeof(melody[0]))
-
 namespace DoorbellE {
 
 class MelodyPlayer {
@@ -30,9 +27,6 @@ public:
 	void play();
 	void stop() { _isPlaying = false; }
 	const bool isPlaying() const { return _isPlaying; }
-
-	template <unsigned int N>
-	void set2(int* arr[N]);
 };
 
 }  // namespace DoorbellE

@@ -1,9 +1,6 @@
 #ifndef _DOORBELLE_LEDBLINKER_H_
 #define _DOORBELLE_LEDBLINKER_H_
 
-#define DOORBELLE_SET_LED_PATTERN(instance, pattern) \
-	instance.setPattern(pattern, sizeof(pattern) / sizeof(pattern[0]))
-
 namespace DoorbellE {
 class LedBlinker {
 private:

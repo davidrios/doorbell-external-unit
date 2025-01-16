@@ -33,9 +33,9 @@ void MelodyPlayer::update() {
 		noteDuration *= 1.5;  // increases the duration in half for dotted notes
 	}
 
-	auto passed = millis() - _lastMillis;
+	auto elapsed = millis() - _lastMillis;
 
-	if (passed >= noteDuration) {
+	if (elapsed >= noteDuration) {
 		_currentPosition += 2;
 		if (_currentPosition >= _melodySize) {
 			_isPlaying = false;
@@ -47,7 +47,7 @@ void MelodyPlayer::update() {
 
 	auto realDuration = noteDuration * 0.9;
 
-	if (passed <= realDuration) {
+	if (elapsed <= realDuration) {
 		if (!_noteStarted) {
 			tone(_buzzerPin, _melody[_currentPosition], realDuration);
 			_noteStarted = true;

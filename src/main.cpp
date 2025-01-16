@@ -7,10 +7,13 @@
 
 #include "buttontoggle.h"
 #include "config.h"
+#include "doorbell.h"
 #include "globals.h"
+#include "interruptbutton.h"
 #include "ledblinker.h"
 #include "melody.h"
 #include "network.h"
+#include "utils.h"
 
 #define BTN1_PIN D1
 #define BTN2_PIN D5
@@ -45,8 +48,34 @@ const int melody1[]
 
 DoorbellE::LedBlinker statusLed(STATUS_LED_PIN, STATUS_LED_ON);
 DoorbellE::Network network(WIFI_SSID, WIFI_KEY, NETWORK_CHECK_INTERVAL);
-DoorbellE::ButtonToggle btn1(BTN1_PIN, HIGH);
+// DoorbellE::ButtonToggle btn1(BTN1_PIN, HIGH);
 DoorbellE::MelodyPlayer melodyPlayer(BUZZER_PIN);
+
+const DoorbellE::Doorbell::MqttConfig mqttConfig = {
+	MQTT_HOST,
+	MQTT_PORT,
+	MQTT_CLIENTID,
+	MQTT_USER,
+	MQTT_PASSWORD,
+	INTERNAL_TOPIC_PREFIX,
+};
+
+#define DEFINE_CLIENT(pin, mode, id) \
+	DOORBELLE_INTERRUPT_BUTTON(__client_##id##_btn, pin, mode)
+
+CLIENTS
+#undef DEFINE_CLIENT
+
+#define DEFINE_CLIENT(pin, mode, id) {&__client_##id##_btn, #id},
+
+const DoorbellE::Doorbell::ClientConfig clients[] = {CLIENTS};
+#undef DEFINE_CLIENT
+
+DoorbellE::Doorbell::Manager
+	doorbellManager(mqttConfig, DOORBELLE_ARRAY_AND_SIZE(clients));
+
+// DOORBELLE_INTERRUPT_BUTTON(btn1, BTN1_PIN, RISING)
+// DOORBELLE_INTERRUPT_BUTTON(btn2, BTN2_PIN, FALLING)
 
 void setup() {
 	Serial.begin(115200);
@@ -54,40 +83,43 @@ void setup() {
 
 	statusLed.start();
 	network.start();
-	btn1.start();
-	DOORBELLE_SET_MELODY(melodyPlayer, melody1);
+	melodyPlayer.setMelody(DOORBELLE_ARRAY_AND_SIZE(melody1));
 	melodyPlayer.start();
-
-	pinMode(BTN2_PIN, INPUT);
+	doorbellManager.start();
+	// btn1.start();
+	// btn2.start();
 
 	Log.traceln("System started");
 }
 
-const unsigned int wifi_connecting_pattern[] = {50, 200};
-const unsigned int test_pattern[] = {1000, 1000};
+const unsigned int wifiConnectingPattern[] = {50, 200};
+const unsigned int mqttConnectingPattern[] = {200, 50};
+const unsigned int testPattern[] = {1000, 1000};
 
 void loop() {
 	network.update();
 	if (!network.isOnline()) {
-		DOORBELLE_SET_LED_PATTERN(statusLed, wifi_connecting_pattern);
+		statusLed.setPattern(DOORBELLE_ARRAY_AND_SIZE(wifiConnectingPattern));
 	}
-	btn1.update();
 
-	if (btn1.getState()) {
-		DOORBELLE_SET_LED_PATTERN(statusLed, test_pattern);
+	doorbellManager.update(network.isOnline());
+	if (doorbellManager.state() == DoorbellE::Doorbell::State::INITIALIZING) {
+		statusLed.setPattern(DOORBELLE_ARRAY_AND_SIZE(mqttConnectingPattern));
 	}
 
 	statusLed.setPattern(NULL, 0);
 
-	int btn2State = digitalRead(BTN2_PIN);
-	// Log.traceln("btn2: %d", btn2State);
-	if (btn2State == HIGH) {
-		if (!melodyPlayer.isPlaying()) {
-			Log.traceln("start melody");
-			melodyPlayer.play();
-		}
-	}
+	// // int btn2State = digitalRead(BTN2_PIN);
+	// // Log.traceln("btn2: %d", btn2State);
+	// if (btn2.isPressed()) {
+	// 	if (!melodyPlayer.isPlaying()) {
+	// 		Log.traceln("start melody");
+	// 		melodyPlayer.play();
+	// 	}
+	// }
 
+	// btn1.update();
+	// btn2.update();
 	melodyPlayer.update();
 	statusLed.update();
 }
