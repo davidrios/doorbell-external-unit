@@ -5,19 +5,15 @@
 #include <ArduinoLog.h>
 #include <TonePitch.h>
 
-#include "buttontoggle.h"
 #include "config.h"
+#ifdef USE_DISPLAY
+#include "display.h"
+#endif
 #include "doorbell.h"
 #include "globals.h"
-#include "interruptbutton.h"
 #include "ledblinker.h"
-#include "melody.h"
 #include "network.h"
 #include "utils.h"
-
-#define BTN1_PIN D1
-#define BTN2_PIN D5
-#define BUZZER_PIN D2
 
 const int nokiaMelody[] = {
 	// Nokia Ringtone
@@ -48,17 +44,18 @@ const int melody1[]
 
 DoorbellE::LedBlinker statusLed(STATUS_LED_PIN, STATUS_LED_ON);
 DoorbellE::Network network(WIFI_SSID, WIFI_KEY, NETWORK_CHECK_INTERVAL);
-// DoorbellE::ButtonToggle btn1(BTN1_PIN, HIGH);
-DoorbellE::MelodyPlayer melodyPlayer(BUZZER_PIN);
+#ifdef USE_DISPLAY
+DoorbellE::Display display(USE_DISPLAY);
+#endif
 
-const DoorbellE::Doorbell::MqttConfig mqttConfig = {
-	MQTT_HOST,
-	MQTT_PORT,
-	MQTT_CLIENTID,
-	MQTT_USER,
-	MQTT_PASSWORD,
-	INTERNAL_TOPIC_PREFIX,
-};
+const DoorbellE::Doorbell::MqttConfig mqttConfig
+	= {MQTT_HOST,
+	   MQTT_PORT,
+	   MQTT_CLIENTID,
+	   MQTT_USER,
+	   MQTT_PASSWORD,
+	   INTERNAL_TOPIC_PREFIX,
+	   EXTERNAL_TOPIC_PREFIX};
 
 #define DEFINE_CLIENT(pin, mode, id) \
 	DOORBELLE_INTERRUPT_BUTTON(__client_##id##_btn, pin, mode)
@@ -71,11 +68,14 @@ CLIENTS
 const DoorbellE::Doorbell::ClientConfig clients[] = {CLIENTS};
 #undef DEFINE_CLIENT
 
-DoorbellE::Doorbell::Manager
-	doorbellManager(mqttConfig, DOORBELLE_ARRAY_AND_SIZE(clients));
-
-// DOORBELLE_INTERRUPT_BUTTON(btn1, BTN1_PIN, RISING)
-// DOORBELLE_INTERRUPT_BUTTON(btn2, BTN2_PIN, FALLING)
+DoorbellE::Doorbell::Manager doorbellManager(
+	mqttConfig,
+	DOORBELLE_ARRAY_AND_SIZE(clients)
+#ifdef BUZZER_PIN
+		,
+	BUZZER_PIN
+#endif
+);
 
 void setup() {
 	Serial.begin(115200);
@@ -83,43 +83,83 @@ void setup() {
 
 	statusLed.start();
 	network.start();
-	melodyPlayer.setMelody(DOORBELLE_ARRAY_AND_SIZE(melody1));
-	melodyPlayer.start();
+
+#ifdef USE_DISPLAY
+	display.start();
+#endif
+
 	doorbellManager.start();
-	// btn1.start();
-	// btn2.start();
 
 	Log.traceln("System started");
 }
 
 const unsigned int wifiConnectingPattern[] = {50, 200};
 const unsigned int mqttConnectingPattern[] = {200, 50};
-const unsigned int testPattern[] = {1000, 1000};
+const unsigned int callingPattern[] = {1000, 1000};
+
+#ifdef USE_DISPLAY
+char connecting[] = "Conectando";
+char wifiText[] = "Wi-Fi...";
+char mqttText[] = "MQTT...";
+char callingText[] = "Chamando";
+const DoorbellE::DisplayDraw wifiConnectingDraw[] = {
+	{0, 0, connecting},
+	{0, 1, wifiText},
+};
+const DoorbellE::DisplayDraw mqttConnectingDraw[] = {
+	{0, 0, connecting},
+	{0, 1, mqttText},
+};
+
+#define DEFINE_CLIENT(pin, mode, id) \
+	char callingClientNameText_##id##_[] = "Casa " #id "...";
+CLIENTS
+#undef DEFINE_CLIENT
+
+#define DEFINE_CLIENT(pin, mode, id) \
+	{{0, 0, callingText}, {0, 1, callingClientNameText_##id##_}},
+
+const DoorbellE::DisplayDraw callingClientsDraw[][2] = {CLIENTS};
+#undef DEFINE_CLIENT
+
+#endif
 
 void loop() {
 	network.update();
 	if (!network.isOnline()) {
 		statusLed.setPattern(DOORBELLE_ARRAY_AND_SIZE(wifiConnectingPattern));
+#ifdef USE_DISPLAY
+		display.setTexts(DOORBELLE_ARRAY_AND_SIZE(wifiConnectingDraw));
+#endif
 	}
 
 	doorbellManager.update(network.isOnline());
 	if (doorbellManager.state() == DoorbellE::Doorbell::State::INITIALIZING) {
 		statusLed.setPattern(DOORBELLE_ARRAY_AND_SIZE(mqttConnectingPattern));
+#ifdef USE_DISPLAY
+		display.setTexts(DOORBELLE_ARRAY_AND_SIZE(mqttConnectingDraw));
+#endif
 	}
+
+	if (doorbellManager.state() == DoorbellE::Doorbell::State::CALLING) {
+		statusLed.setPattern(DOORBELLE_ARRAY_AND_SIZE(callingPattern));
+
+#ifdef USE_DISPLAY
+		display.setTexts(DOORBELLE_ARRAY_AND_SIZE(
+			callingClientsDraw[doorbellManager.currentClient()]
+		));
+#endif
+	}
+
+#ifdef USE_DISPLAY
+	display.setTexts(NULL, 0);
+#endif
 
 	statusLed.setPattern(NULL, 0);
 
-	// // int btn2State = digitalRead(BTN2_PIN);
-	// // Log.traceln("btn2: %d", btn2State);
-	// if (btn2.isPressed()) {
-	// 	if (!melodyPlayer.isPlaying()) {
-	// 		Log.traceln("start melody");
-	// 		melodyPlayer.play();
-	// 	}
-	// }
+#ifdef USE_DISPLAY
+	display.update();
+#endif
 
-	// btn1.update();
-	// btn2.update();
-	melodyPlayer.update();
 	statusLed.update();
 }

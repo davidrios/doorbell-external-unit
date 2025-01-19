@@ -19,8 +19,8 @@ public:
 	~LedBlinker() {}
 
 	void start();
-	void setPattern(const unsigned int* pattern, unsigned int size);
 	void update();
+	void setPattern(const unsigned int* pattern, unsigned int size);
 };
 }  // namespace DoorbellE
 
